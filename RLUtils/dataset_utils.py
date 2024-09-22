@@ -2,8 +2,9 @@ import gym
 import d4rl
 import numpy as np
 import collections
-
-
+import copy
+import d4rl_ext
+from tqdm import tqdm
 def load_environment(name):
     if type(name) != str:
         ## name is already an environment
@@ -12,6 +13,9 @@ def load_environment(name):
     #     wrapped_env = gym.make(name)
     wrapped_env = gym.make(name)
     env = wrapped_env.unwrapped
+    # if "antmaze" in name: 
+    #     env.max_episode_steps = env._max_episode_steps
+    # else:
     env.max_episode_steps = wrapped_env._max_episode_steps
     env.name = name
     return env
@@ -23,10 +27,33 @@ def get_dataset(env):
 # 返回值： 1. 所有的切分的trajectory  2. 原始的dataset
 # 注意： 没有做padding
 # 需要检查maze2d
+
+def get_antmaze_dataset(env):
+
+    # dones_float = np.zeros_like(dataset['rewards'])
+    dataset = d4rl.qlearning_dataset(env)
+    dataset_ = copy.deepcopy(dataset)
+    dataset_['terminals'][:] = 0.
+    dataset_['timeout'] = np.zeros_like(  dataset_['terminals']  )
+    for i in tqdm(range(len(dataset_['terminals']) - 1), desc = "Loading Antmaze. Rebuilding terminal signal."):
+        if np.linalg.norm(dataset['observations'][i + 1] - dataset['next_observations'][i]) > 1e-6:
+            dataset_['terminals'][i] = 1
+        else:
+            dataset_['terminals'][i] = 0
+    dataset_['terminals'][-1] = 1
+    return dataset_
+
 def sequence_dataset(env):
-    dataset = get_dataset(env)
+    
     # dataset = preprocess_fn(dataset)
 
+    if "antmaze" in env.spec.id:
+        dataset = get_antmaze_dataset(env)
+    else:
+        dataset = get_dataset(env)
+
+    # if "kitchen" in env.spec.id:
+    #     dataset['observations'] += (np.random.rand(dataset['observations'].shape[0]*dataset['observations'].shape[1]).reshape(dataset['observations'].shape)-0.5)/1e14
     N = dataset['rewards'].shape[0]
     data_ = collections.defaultdict(list)
 
@@ -41,7 +68,7 @@ def sequence_dataset(env):
         if use_timeouts:
             final_timestep = dataset['timeouts'][i]
         else:
-            final_timestep = (episode_step == env._max_episode_steps - 1)
+            final_timestep = (episode_step == env.max_episode_steps - 1)
 
         for k in dataset:
             if 'metadata' in k: continue
@@ -58,7 +85,7 @@ def sequence_dataset(env):
             if 'maze2d' in env.name:
                 episode_data = process_maze2d_episode(episode_data)
             episode_data['start'] = start
-            episode_data['end'] = end
+            episode_data['end'] = end + 1
             episode_data['accumulated_reward'] = np.sum(episode_data['rewards'])
             start = end + 1
             all_data.append(episode_data)
