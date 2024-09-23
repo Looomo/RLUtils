@@ -9,11 +9,11 @@ import string
 from .mylogger import MyLogger
 import time
 
-def get_latest_epoch(loadpath, template = 'state_[0-9]*.pt', extend = '*.pt'):
+def get_latest_epoch(loadpath, template = 'state_[0-9]*.pt', extend_with_point = '.pt'):
     states = glob.glob1(loadpath, template)
     latest_epoch = -1
     for state in states:
-        epoch = int(state.replace('state_', '').replace(extend, ''))
+        epoch = int(state.replace('state_', '').replace(extend_with_point, ''))
         latest_epoch = max(epoch, latest_epoch)
     return latest_epoch
 

@@ -18,7 +18,7 @@ class SharedConfigs:
         "{str(args.m_tag)}" #
         ]
     }
-
+    _dict = {}
     logbase = "logs"
     # save_path_template = 'f"{Configs.logbase}"'
     m_tag: None
