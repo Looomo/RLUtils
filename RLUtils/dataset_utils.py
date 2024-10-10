@@ -34,7 +34,7 @@ def get_antmaze_dataset(env):
     dataset = d4rl.qlearning_dataset(env)
     dataset_ = copy.deepcopy(dataset)
     dataset_['terminals'][:] = 0.
-    dataset_['timeout'] = np.zeros_like(  dataset_['terminals']  )
+    dataset_['timeouts'] = np.zeros_like(  dataset_['terminals']  )
     for i in tqdm(range(len(dataset_['terminals']) - 1), desc = "Loading Antmaze. Rebuilding terminal signal."):
         if np.linalg.norm(dataset['observations'][i + 1] - dataset['next_observations'][i]) > 1e-6:
             dataset_['terminals'][i] = 1
@@ -43,7 +43,7 @@ def get_antmaze_dataset(env):
     dataset_['terminals'][-1] = 1
     return dataset_
 
-def sequence_dataset(env):
+def sequence_dataset(env, *args, **kwargs):
     
     # dataset = preprocess_fn(dataset)
 

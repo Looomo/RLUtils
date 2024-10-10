@@ -7,16 +7,6 @@ import copy
 import pickle as pkl
 class SharedConfigs:
     save_path_template = {
-        "plan1": [
-        "{args.logbase}",
-        "{args.branch}",
-        "{args.dataset}",
-        "LaysEmbdP{args.m_p_layers}_{args.m_p_embds}_V{args.m_v_layers}_{args.m_v_embds}_VDis{args.m_discount:.2f}", # args of policy and value
-        "Rep{int(args.m_use_rep)}Embd{args.m_rep_embds}", # use rep or not
-        "T{args.m_temperature}NxtK{args.m_next_key}PRandNxt{args.meta_p_randomnext:.2f}PRandG{args.meta_p_randomgoal:.2f}", # args of meta
-        "PGoal_CT_{args.p_currgoal:.2f}{args.p_trajgoal:.2f}", # args of random goal values
-        "{str(args.m_tag)}" #
-        ]
     }
     _dict = {}
     logbase = "logs"
