@@ -20,9 +20,12 @@ class SharedConfigs:
     def __call__():
         return SharedConfigs._dict
     
-    def eval_path(template, args):
+    def eval_path(template, requirements = None, *args, **kwargs):
         template = "f'" + template + "'"
-        args = SharedConfigs.args
+        for k,v in requirements.items(): globals()[k] = v
+
+        # eval(requirements)
+        # args = SharedConfigs.args
         # evaled = [ eval( para ) for para in template ]
         save_path =  eval(template) # os.path.join(*evaled)
         os.makedirs( save_path, exist_ok=True )
