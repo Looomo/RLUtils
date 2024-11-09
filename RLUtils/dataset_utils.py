@@ -5,6 +5,7 @@ import collections
 import copy
 import d4rl_ext
 from tqdm import tqdm
+from collections import defaultdict
 def load_environment(name):
     if type(name) != str:
         ## name is already an environment
@@ -35,7 +36,7 @@ def get_antmaze_dataset(env):
     dataset_ = copy.deepcopy(dataset)
     dataset_['terminals'][:] = 0.
     dataset_['timeouts'] = np.zeros_like(  dataset_['terminals']  )
-    for i in tqdm(range(len(dataset_['terminals']) - 1), desc = "Loading Antmaze. Rebuilding terminal signal."):
+    for i in tqdm(range(len(dataset_['terminals']) - 1), desc = "Loading Antmaze. Rebuilding terminal signal"):
         if np.linalg.norm(dataset['observations'][i + 1] - dataset['next_observations'][i]) > 1e-6:
             dataset_['terminals'][i] = 1
         else:
@@ -43,14 +44,19 @@ def get_antmaze_dataset(env):
     dataset_['terminals'][-1] = 1
     return dataset_
 
-def sequence_dataset(env, *args, **kwargs):
+
+
+def sequence_dataset(env,  *args, **kwargs):
     
     # dataset = preprocess_fn(dataset)
-
+    dataset = get_dataset(env)
     if "antmaze" in env.spec.id:
         dataset = get_antmaze_dataset(env)
-    else:
-        dataset = get_dataset(env)
+    
+
+
+    rebuild_next_observ_required = 'maze2d' in env.name or 'kitchen' in env.name
+    # if "kitchen" in env.spec.id: dataset = build_next_observ(dataset)
 
     # if "kitchen" in env.spec.id:
     #     dataset['observations'] += (np.random.rand(dataset['observations'].shape[0]*dataset['observations'].shape[1]).reshape(dataset['observations'].shape)-0.5)/1e14
@@ -82,8 +88,10 @@ def sequence_dataset(env, *args, **kwargs):
             episode_data = {}
             for k in data_:
                 episode_data[k] = np.array(data_[k])
-            if 'maze2d' in env.name:
-                episode_data = process_maze2d_episode(episode_data)
+            if rebuild_next_observ_required:
+                episode_data = rebuild_next_observ(episode_data)
+                if "kitchen" in env.name: episode_data['terminals'][-1] = True
+                # episode_data = process_maze2d_episode(episode_data)
             episode_data['start'] = start
             episode_data['end'] = end + 1
             episode_data['accumulated_reward'] = np.sum(episode_data['rewards'])
@@ -92,8 +100,38 @@ def sequence_dataset(env, *args, **kwargs):
             data_ = collections.defaultdict(list)
 
         episode_step += 1
+    
+    if rebuild_next_observ_required:
+        dataset_ = defaultdict(list)
 
+
+        for traj in all_data:
+            for k,v in traj.items():
+                if k in ['start', 'end', 'accumulated_reward']: continue
+                dataset_[k].append(v)
+        
+        for k,v in dataset_.items(): 
+            
+            try:
+                dataset_[k] = np.concatenate(v)
+            except Exception as e:
+                dataset_[k] = np.array(v)
+        dataset = dataset_
     return all_data, dataset
+
+
+
+def rebuild_next_observ(episode):
+    '''
+        adds in `next_observations` field to episode
+    '''
+    assert 'next_observations' not in episode
+    length = len(episode['observations'])
+    next_observations = episode['observations'][1:].copy()
+    for key, val in episode.items():
+        episode[key] = val[:-1]
+    episode['next_observations'] = next_observations
+    return episode
 
 
 
