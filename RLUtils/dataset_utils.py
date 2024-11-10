@@ -238,6 +238,5 @@ def determain_env_type_match(env_full_name, env_type: str):
 
 def predownload(env_name):
     env = load_environment(env_name)
-    trajs, _ = sequence_dataset_mix(env)
-
+    trajs, _ = sequence_dataset(env)
     return
