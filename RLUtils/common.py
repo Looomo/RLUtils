@@ -8,6 +8,37 @@ import time
 import string
 from .mylogger import MyLogger
 import time
+import copy
+
+
+def check_undetected_terminal(dataset, thresh = 1.0):
+    for i in range( len(dataset['observations']) - 1):
+        if np.max( np.abs( dataset['observations'][i+1] - dataset['observations'][i] ) ) > thresh:
+            assert dataset['terminals'][i], f"Found undetected terminal: {i}"
+
+def check_invalid_terminal(dataset, thresh = 1.0):
+    # for i in range( len(dataset['observations']) - 1):
+    #     if np.max( np.abs( dataset['observations'][i+1] - dataset['observations'][i] ) ) > thresh:
+    #         assert dataset['terminals'][i], f"Found undetected terminal: {i}"
+
+    for i in range( len(dataset['observations']) - 1):
+        if dataset['terminals'][i]:
+            
+            assert np.max( np.abs( dataset['observations'][i+1] - dataset['observations'][i] ) ) > thresh, f"Found invalid terminal: {i}"
+    return
+
+
+def rebuild_terminals_by_thresh(dataset_, thresh = 1.0):
+    dataset = copy.deepcopy(dataset_)
+    dataset['terminals'][:] = 0.
+
+    for i in range(len(dataset['terminals']) - 1):
+        if np.max( np.abs( dataset['observations'][i + 1] - dataset['observations'][i] ) ) > thresh:
+            dataset['terminals'][i] = 1.
+        else:
+            dataset['terminals'][i] = 0.
+
+    return dataset
 
 def get_latest_epoch(loadpath, template = 'state_[0-9]*.pt', extend_with_point = '.pt'):
     states = glob.glob1(loadpath, template)

@@ -6,6 +6,7 @@ import copy
 import d4rl_ext
 from tqdm import tqdm
 from collections import defaultdict
+from .common import rebuild_terminals_by_thresh, check_undetected_terminal, check_invalid_terminal
 def load_environment(name):
     if type(name) != str:
         ## name is already an environment
@@ -44,18 +45,44 @@ def get_antmaze_dataset(env):
     dataset_['terminals'][-1] = 1
     return dataset_
 
+def terminal_on_timeout(env_name):
 
+    datasets_terminal_on_timeout = [
 
-def sequence_dataset(env,  *args, **kwargs):
+    ]
+
+    # except kitchen
+    # except antmaze
+
+    for dataset in datasets_terminal_on_timeout:
+        if dataset in env_name: return True
+    return False
+
+def sequence_dataset(env,  rewrite_last_terminal = True, build_next_obs = True,  *args, **kwargs):
     
     # dataset = preprocess_fn(dataset)
+
+
     dataset = get_dataset(env)
-    if "antmaze" in env.spec.id:
-        dataset = get_antmaze_dataset(env)
+
+    env_type = determain_env(env.spec.id)
+    
+    if env_type['antmaze']: dataset = get_antmaze_dataset(env)
+    if env_type['frankakitchen']: dataset = rebuild_terminals_by_thresh(dataset)
+
+
+
+    if rewrite_last_terminal: dataset['terminals'][-1] = 1.
+
+    check_undetected_terminal(dataset)
+    check_invalid_terminal(dataset)
+
     
 
 
     rebuild_next_observ_required = 'maze2d' in env.name or 'kitchen' in env.name
+
+
     # if "kitchen" in env.spec.id: dataset = build_next_observ(dataset)
 
     # if "kitchen" in env.spec.id:
@@ -80,17 +107,20 @@ def sequence_dataset(env,  *args, **kwargs):
             if 'metadata' in k: continue
             data_[k].append(dataset[k][i])
 
-        if done_bool or final_timestep:
+        if done_bool or (final_timestep and terminal_on_timeout(env)):
+            # if done_bool and final_timestep: print("whatthehell")
             # if done_bool:
             #     print("what the hell")
+            # if final_timestep:
+            #     print("hello")
             end = i
             episode_step = 0
             episode_data = {}
             for k in data_:
                 episode_data[k] = np.array(data_[k])
-            if rebuild_next_observ_required:
+            if rebuild_next_observ_required and build_next_obs:
                 episode_data = rebuild_next_observ(episode_data)
-                if "kitchen" in env.name: episode_data['terminals'][-1] = True
+                if "kitchen" in env.name and done_bool: episode_data['terminals'][-1] = True
                 # episode_data = process_maze2d_episode(episode_data)
             episode_data['start'] = start
             episode_data['end'] = end + 1
@@ -101,7 +131,7 @@ def sequence_dataset(env,  *args, **kwargs):
 
         episode_step += 1
     
-    if rebuild_next_observ_required:
+    if rebuild_next_observ_required and build_next_obs:
         dataset_ = defaultdict(list)
 
 
@@ -135,17 +165,17 @@ def rebuild_next_observ(episode):
 
 
 
-def process_maze2d_episode(episode):
-    '''
-        adds in `next_observations` field to episode
-    '''
-    assert 'next_observations' not in episode
-    length = len(episode['observations'])
-    next_observations = episode['observations'][1:].copy()
-    for key, val in episode.items():
-        episode[key] = val[:-1]
-    episode['next_observations'] = next_observations
-    return episode
+# def process_maze2d_episode(episode):
+#     '''
+#         adds in `next_observations` field to episode
+#     '''
+#     assert 'next_observations' not in episode
+#     length = len(episode['observations'])
+#     next_observations = episode['observations'][1:].copy()
+#     for key, val in episode.items():
+#         episode[key] = val[:-1]
+#     episode['next_observations'] = next_observations
+#     return episode
 
 
 meta_infos = {
@@ -184,16 +214,27 @@ meta_infos = {
 
 
 def determain_env(env_full_name):
+    # base_task = env_full_name.split("-")[0]
+    # what_env_is_it = {
+    #     'maze2d': 'maze2d' in env_full_name,
+    #     'antmaze': 'antmaze-' in env_full_name,
+    #     'adroit': 'pen-' in env_full_name or 'hammer-' in env_full_name or 'door-' in env_full_name or 'relocate-' in env_full_name,
+    #     'gym': base_task in meta_infos['gym'],
+    #     'kitchen': 'kitchen' in env_full_name
+    # }
+    what_env_is_it = {}
 
-    what_env_is_it = {
-        'maze2d': 'maze2d' in env_full_name,
-        'antmaze': 'antmaze-' in env_full_name,
-        'adroit': 'pen-' in env_full_name or 'hammer-' in env_full_name or 'door-' in env_full_name or 'relocate-' in env_full_name,
-        'gym': '-v2' in env_full_name,
-        'kitchen': 'kitchen' in env_full_name
-    }
-
+    for env_type in meta_infos.keys(): what_env_is_it[env_type] = determain_env_type_match( env_full_name,env_type  )
     return what_env_is_it
+
+
+def determain_env_type_match(env_full_name, env_type: str):
+    # if env_type not in meta_infos.keys():
+    #     print
+    assert env_type in meta_infos.keys(), f"env_type must be selected from: { meta_infos.keys()}"
+    base_task = env_full_name.split("-")[0]
+    return base_task in meta_infos[env_type]['tasks']
+
 
 def predownload(env_name):
     env = load_environment(env_name)

@@ -8,8 +8,9 @@ import gym
 import mujoco_py as mjc
 import warnings
 import pdb
-
-
+from dm_control.mujoco import engine
+from .dataset_utils import determain_env
+import warnings
 
 #-----------------------------------------------------------------------------#
 #------------------------------- helper structs ------------------------------#
@@ -46,6 +47,78 @@ def atmost_2d(x):
 #-----------------------------------------------------------------------------#
 #---------------------------------- renderers --------------------------------#
 #-----------------------------------------------------------------------------#
+
+
+                
+# renderer = MuJoCoRenderer(env)
+# if "kitchen" in name:
+#     renderer = engine.MovableCamera(env.sim, 1920, 2560)
+
+# render_state_idx(   env_name, dataset, state_id, renderer,  savepath = target_folder, ismaze = bool("maze2d" in name), ismujoco = bool("ant-" in name) , isantmaze = bool("antmaze" in name), env=env   )
+
+                
+
+def render_image(env_name, dataset, idx, env_type, env):
+
+    render_kwargs = {
+            'trackbodyid': 2,
+            'distance': 1,
+            'lookat': [0, -5, 2],
+            'elevation': 0
+        }
+    
+    if env_type['frankakitchen']:
+        assert 'MUJOCO_GL' in os.environ and os.environ['MUJOCO_GL'] == "egl", "Please set environment variable MUJOCO_GL=egl to render Kitchen."
+        renderer = engine.MovableCamera(env.sim, 1920, 2560)
+        return render_image_kitchen( dataset, idx, env )
+    
+    elif env_type['maze2d']:
+        renderer = MuJoCoRenderer(env)
+        renderer.env.set_target(dataset['infos/goal'][idx])
+        renderer.env.set_marker()
+    elif env_type['gym']:
+        renderer = MuJoCoRenderer(env)
+        for key, val in render_kwargs.items():
+            if key == 'lookat':
+                renderer.viewer.cam.lookat[:] = val[:]
+            else:
+                setattr(renderer.viewer.cam, key, val)
+
+    elif env_type['antmaze']:
+        renderer = MuJoCoRenderer(env)
+        renderer.env.set_target(dataset['infos/goal'][idx])
+
+    else:
+        raise NotImplementedError(f"rendering.py: env {env_name} not supported yet. ")
+    
+
+    renderer.env.set_state(dataset['infos/qpos'][idx], dataset['infos/qvel'][idx])
+    renderer.viewer.render(512,512)
+    data = renderer.viewer.read_pixels(512,512, depth=False)
+    image = data[::-1, :, :]
+    return image
+
+def render_image_kitchen( dataset, idx, env):
+    
+    obs = dataset['observations'][idx]
+    qpos = obs[:30]
+    env.robot.reset(env, qpos, np.zeros_like(qpos))
+    camera = engine.MovableCamera(env.sim, 1920, 2560)
+    camera.set_pose(distance=2.2, lookat=[-0.2, .5, 2.], azimuth=70, elevation=-35)
+    image = camera.render()
+    return image
+
+
+def render_state_idx(env_name, dataset, idx, savepath = "./", env = None, dpi = 200):
+
+    assert env is not None, "env must be provided for rendering."
+    if not os.path.exists(savepath): os.makedirs(savepath)
+    env_type = determain_env(env_name)
+    image = render_image(env_name, dataset, idx, env_type, env)
+    plt.figure(); plt.clf(); plt.cla(); plt.imshow(image)
+    plt.savefig(os.path.join(savepath,  f"{env_name}-{idx}.png"), dpi = dpi  )
+
+
 
 class MuJoCoRenderer:
     '''
