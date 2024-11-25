@@ -7,10 +7,14 @@ import d4rl_ext
 from tqdm import tqdm
 from collections import defaultdict
 from .common import rebuild_terminals_by_thresh, check_undetected_terminal, check_invalid_terminal
+import GymCalvin
 def load_environment(name):
     if type(name) != str:
         ## name is already an environment
         return name
+    env_types = determain_env(name)
+    if env_types['calvin']:
+        return GymCalvin.make(name)
     # with suppress_output():
     #     wrapped_env = gym.make(name)
     wrapped_env = gym.make(name)
@@ -58,14 +62,37 @@ def terminal_on_timeout(env_name):
         if dataset in env_name: return True
     return False
 
-def sequence_dataset(env,  rewrite_last_terminal = True, build_next_obs = True,  *args, **kwargs):
+
+# note: i do not build next observ
+def sequence_to_plain(all_data: list):
+    dataset_ = defaultdict(list)
+
+
+    for traj in all_data:
+        for k,v in traj.items():
+            if k in ['start', 'end', 'accumulated_reward']: continue
+            dataset_[k].append(v)
+    
+    for k,v in dataset_.items(): 
+        
+        try:
+            dataset_[k] = np.concatenate(v)
+        except Exception as e:
+            dataset_[k] = np.array(v)
+    dataset = dataset_
+
+    return dataset
+
+
+
+def sequence_dataset(env,  rewrite_last_terminal = True, build_next_obs = True, check_terminals = True, dataset = None,  *args, **kwargs):
     
     # dataset = preprocess_fn(dataset)
-
-
-    dataset = get_dataset(env)
-
     env_type = determain_env(env.spec.id)
+    if dataset is None:
+        dataset = get_dataset(env)
+
+    
     
     if env_type['antmaze']: dataset = get_antmaze_dataset(env)
     if env_type['frankakitchen']: dataset = rebuild_terminals_by_thresh(dataset)
@@ -74,13 +101,14 @@ def sequence_dataset(env,  rewrite_last_terminal = True, build_next_obs = True, 
 
     if rewrite_last_terminal: dataset['terminals'][-1] = 1.
 
-    check_undetected_terminal(dataset)
-    check_invalid_terminal(dataset)
+    # if check_terminals:
+    #     check_undetected_terminal(dataset)
+    #     check_invalid_terminal(dataset)
 
     
 
 
-    rebuild_next_observ_required = 'maze2d' in env.name or 'kitchen' in env.name
+    rebuild_next_observ_required = env_type['maze2d'] or env_type['frankakitchen'] # 'kitchen' in env.spec.id
 
 
     # if "kitchen" in env.spec.id: dataset = build_next_observ(dataset)
@@ -210,6 +238,12 @@ meta_infos = {
         "versions":["v0"],
         "sparse": "Dense"
     },
+    "calvin": {
+        'tasks': ['calvin'],
+        'datasets':[''],
+        "versions":[''],
+        "sparse": "All zero. No reward at all."
+    },
 }
 
 
@@ -222,9 +256,13 @@ def determain_env(env_full_name):
     #     'gym': base_task in meta_infos['gym'],
     #     'kitchen': 'kitchen' in env_full_name
     # }
-    what_env_is_it = {}
-
-    for env_type in meta_infos.keys(): what_env_is_it[env_type] = determain_env_type_match( env_full_name,env_type  )
+    what_env_is_it = {
+        "__UNKNOWN_ENV__": True
+    }
+    for env_type in meta_infos.keys(): 
+        is_env_type = determain_env_type_match( env_full_name,env_type  )
+        what_env_is_it[env_type] = is_env_type
+        if is_env_type: what_env_is_it["__UNKNOWN_ENV__"] = False
     return what_env_is_it
 
 

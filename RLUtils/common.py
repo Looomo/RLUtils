@@ -11,24 +11,37 @@ import time
 import copy
 
 
-def check_undetected_terminal(dataset, thresh = 1.0):
+def cal_distance(a, b, metric = "Chebyshev"):
+
+    if metric == "Chebyshev":
+        distance = np.max( np.abs( a - b ) )
+    elif metric == "Euclidean":
+        distance = np.linalg.norm(a - b )
+    elif metric == "Cosine":
+        distance = np.dot(a, b) / (np.linalg.norm(a) * np.linalg.norm(b))
+        distance = 1 - (distance + 1)/2
+    else:
+        raise NotImplementedError(f"Distance metric {metric} not supported yet.")
+
+    return distance
+
+def check_undetected_terminal(dataset, thresh = 1.0, metric = "Chebyshev"):
     for i in range( len(dataset['observations']) - 1):
-        if np.max( np.abs( dataset['observations'][i+1] - dataset['observations'][i] ) ) > thresh:
+        if cal_distance(dataset['observations'][i+1], dataset['observations'][i], metric=metric ) > thresh:
             assert dataset['terminals'][i], f"Found undetected terminal: {i}"
 
-def check_invalid_terminal(dataset, thresh = 1.0):
+def check_invalid_terminal(dataset, thresh = 1.0, metric = "Chebyshev"):
     # for i in range( len(dataset['observations']) - 1):
     #     if np.max( np.abs( dataset['observations'][i+1] - dataset['observations'][i] ) ) > thresh:
     #         assert dataset['terminals'][i], f"Found undetected terminal: {i}"
 
     for i in range( len(dataset['observations']) - 1):
         if dataset['terminals'][i]:
-            
-            assert np.max( np.abs( dataset['observations'][i+1] - dataset['observations'][i] ) ) > thresh, f"Found invalid terminal: {i}"
+            assert  cal_distance(dataset['observations'][i+1], dataset['observations'][i], metric=metric ) > thresh, f"Found invalid terminal: {i}"
     return
 
 
-def rebuild_terminals_by_thresh(dataset_, thresh = 1.0):
+def rebuild_terminals_by_thresh(dataset_, thresh = 1.0 , metrics = ""):
     dataset = copy.deepcopy(dataset_)
     dataset['terminals'][:] = 0.
 

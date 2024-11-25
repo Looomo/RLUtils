@@ -11,7 +11,6 @@ import pdb
 from dm_control.mujoco import engine
 from .dataset_utils import determain_env
 import warnings
-
 #-----------------------------------------------------------------------------#
 #------------------------------- helper structs ------------------------------#
 #-----------------------------------------------------------------------------#
@@ -58,7 +57,7 @@ def atmost_2d(x):
 
                 
 
-def render_image(env_name, dataset, idx, env_type, env):
+def render_image(env_name, dataset, idx, env_type, env, renderer = None):
 
     render_kwargs = {
             'trackbodyid': 2,
@@ -76,6 +75,7 @@ def render_image(env_name, dataset, idx, env_type, env):
         renderer = MuJoCoRenderer(env)
         renderer.env.set_target(dataset['infos/goal'][idx])
         renderer.env.set_marker()
+        return render_image_default(dataset, idx, renderer)
     elif env_type['gym']:
         renderer = MuJoCoRenderer(env)
         for key, val in render_kwargs.items():
@@ -83,20 +83,46 @@ def render_image(env_name, dataset, idx, env_type, env):
                 renderer.viewer.cam.lookat[:] = val[:]
             else:
                 setattr(renderer.viewer.cam, key, val)
-
+        return render_image_default(dataset, idx, renderer)
     elif env_type['antmaze']:
         renderer = MuJoCoRenderer(env)
         renderer.env.set_target(dataset['infos/goal'][idx])
-
+        return render_image_default(dataset, idx, renderer)
+    elif env_type['calvin']:
+        # renderer = MuJoCoRenderer(env)
+        return render_image_calvin(dataset, idx, renderer = env)
     else:
-        raise NotImplementedError(f"rendering.py: env {env_name} not supported yet. ")
+        assert env_type["__UNKNOWN_ENV__"]
+        # assert renderer is not None, f"Env {env_name} is not supported yet, you must porovide a renderer."
+        raise NotImplementedError(f"Env {env_name} is not supported yet.")
+
     
 
+    return False
+    # return render_image(dataset, idx, renderer)
+
+
+def render_image_default( dataset, idx, renderer):
+    
+    obs = dataset['observations'][idx]
     renderer.env.set_state(dataset['infos/qpos'][idx], dataset['infos/qvel'][idx])
     renderer.viewer.render(512,512)
     data = renderer.viewer.read_pixels(512,512, depth=False)
     image = data[::-1, :, :]
     return image
+
+
+def render_image_calvin( dataset, idx, renderer):
+    
+    obs = dataset['observations'][idx]
+    renderer.reset_to_state(obs)
+    rgb_obs, depth_obs = renderer.get_camera_obs(wh=512)
+    # renderer.viewer.render(512,512)
+    # data = renderer.viewer.read_pixels(512,512, depth=False)
+    # image = rgb_obs[::-1, :, :]
+    for k, v in rgb_obs.items(): image = v
+    return image
+
 
 def render_image_kitchen( dataset, idx, env):
     
@@ -109,12 +135,14 @@ def render_image_kitchen( dataset, idx, env):
     return image
 
 
-def render_state_idx(env_name, dataset, idx, savepath = "./", env = None, dpi = 200):
+def render_state_idx(env_name, dataset, idx, savepath = "./", env = None, dpi = 200, renderer = None):
 
-    assert env is not None, "env must be provided for rendering."
-    if not os.path.exists(savepath): os.makedirs(savepath)
     env_type = determain_env(env_name)
-    image = render_image(env_name, dataset, idx, env_type, env)
+
+    assert env is not None and not env_type["__UNKNOWN_ENV__"], "env must be provided for rendering."
+    if not os.path.exists(savepath): os.makedirs(savepath)
+    
+    image = render_image(env_name, dataset, idx, env_type, env, renderer=renderer)
     plt.figure(); plt.clf(); plt.cla(); plt.imshow(image)
     plt.savefig(os.path.join(savepath,  f"{env_name}-{idx}.png"), dpi = dpi  )
 
@@ -129,7 +157,12 @@ class MuJoCoRenderer:
         self.deviceid = deviceid
         if type(env) is str:
             env = env_map(env)
-            self.env = gym.make(env)
+            env_types = determain_env(env)
+            if env_types['calvin']:
+                import GymCalvin
+                self.env = GymCalvin.make(env).unwrapped
+            else:
+                self.env = gym.make(env)
         else:
             self.env = env
         ## - 1 because the envs in renderer are fully-observed
