@@ -51,16 +51,18 @@ def get_antmaze_dataset(env):
 
 def terminal_on_timeout(env_name):
 
-    datasets_terminal_on_timeout = [
-
+    datasets_does_not_terminal_on_timeout = [
+        "frankakitchen",
+        "antmaze"
     ]
 
     # except kitchen
     # except antmaze
 
-    for dataset in datasets_terminal_on_timeout:
-        if dataset in env_name: return True
-    return False
+    for dataset in datasets_does_not_terminal_on_timeout:
+        if determain_env_type_match(env_full_name=env_name, env_type =  dataset):
+            return False
+    return True
 
 
 # note: i do not build next observ
@@ -96,7 +98,7 @@ def sequence_dataset(env,  rewrite_last_terminal = True, build_next_obs = True, 
     
     if env_type['antmaze']: dataset = get_antmaze_dataset(env)
     if env_type['frankakitchen']: dataset = rebuild_terminals_by_thresh(dataset)
-
+    should_terminal_on_timeout = terminal_on_timeout(env.spec.id)
 
 
     if rewrite_last_terminal: dataset['terminals'][-1] = 1.
@@ -135,7 +137,7 @@ def sequence_dataset(env,  rewrite_last_terminal = True, build_next_obs = True, 
             if 'metadata' in k: continue
             data_[k].append(dataset[k][i])
 
-        if done_bool or (final_timestep and terminal_on_timeout(env)):
+        if done_bool or (final_timestep and should_terminal_on_timeout):
             # if done_bool and final_timestep: print("whatthehell")
             # if done_bool:
             #     print("what the hell")
@@ -148,21 +150,36 @@ def sequence_dataset(env,  rewrite_last_terminal = True, build_next_obs = True, 
                 episode_data[k] = np.array(data_[k])
             if rebuild_next_observ_required and build_next_obs:
                 episode_data = rebuild_next_observ(episode_data)
-                if "kitchen" in env.name and done_bool: episode_data['terminals'][-1] = True
-                # episode_data = process_maze2d_episode(episode_data)
-            episode_data['start'] = start
-            episode_data['end'] = end + 1
+                if determain_env_type_match(env.spec.id, "frankakitchen") and done_bool: episode_data['terminals'][-1] = True
+                # end -= 1 # 需要构建next时，会丢失一个
+                # start -= 1
+            #     episode_data['start'] = start
+            #     episode_data['end'] = end
+            #     start = end + 2
+            #     # episode_data = process_maze2d_episode(episode_data)
+            # else:
+            #     episode_data['start'] = start
+            #     episode_data['end'] = end + 1
+            #     start = end + 1
             episode_data['accumulated_reward'] = np.sum(episode_data['rewards'])
-            start = end + 1
+            
             all_data.append(episode_data)
             data_ = collections.defaultdict(list)
 
         episode_step += 1
     
+    
+    start = 0
+    for traj in all_data:
+        end = start + len(traj['observations'])
+        traj['start'] = start
+        traj['end'] = end
+        start = end
+
     if rebuild_next_observ_required and build_next_obs:
         dataset_ = defaultdict(list)
 
-
+        start = 0
         for traj in all_data:
             for k,v in traj.items():
                 if k in ['start', 'end', 'accumulated_reward']: continue

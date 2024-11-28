@@ -26,19 +26,26 @@ def cal_distance(a, b, metric = "Chebyshev"):
     return distance
 
 def check_undetected_terminal(dataset, thresh = 1.0, metric = "Chebyshev"):
+    invalids = []
     for i in range( len(dataset['observations']) - 1):
-        if cal_distance(dataset['observations'][i+1], dataset['observations'][i], metric=metric ) > thresh:
-            assert dataset['terminals'][i], f"Found undetected terminal: {i}"
+        distance = cal_distance(dataset['observations'][i+1], dataset['observations'][i], metric=metric )
+        if distance > thresh:
+            if not dataset['terminals'][i]:
+                 invalids.append(  (i, distance, thresh)  )
+    return invalids
 
 def check_invalid_terminal(dataset, thresh = 1.0, metric = "Chebyshev"):
     # for i in range( len(dataset['observations']) - 1):
     #     if np.max( np.abs( dataset['observations'][i+1] - dataset['observations'][i] ) ) > thresh:
     #         assert dataset['terminals'][i], f"Found undetected terminal: {i}"
-
+    invalids = []
     for i in range( len(dataset['observations']) - 1):
         if dataset['terminals'][i]:
-            assert  cal_distance(dataset['observations'][i+1], dataset['observations'][i], metric=metric ) > thresh, f"Found invalid terminal: {i}"
-    return
+            # assert  cal_distance(dataset['observations'][i+1], dataset['observations'][i], metric=metric ) > thresh, f"Found invalid terminal: {i}"
+            distance = cal_distance(dataset['observations'][i+1], dataset['observations'][i], metric=metric )
+            if distance <= thresh:
+                invalids.append(  (i, distance, thresh)  )
+    return invalids
 
 
 def rebuild_terminals_by_thresh(dataset_, thresh = 1.0 , metrics = ""):
