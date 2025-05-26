@@ -8,6 +8,9 @@ from tqdm import tqdm
 from collections import defaultdict
 from .common import rebuild_terminals_by_thresh, check_undetected_terminal, check_invalid_terminal
 import GymCalvin
+import procgen
+from .wrappers import ProcgenWrappedEnv
+
 def load_environment(name):
     if type(name) != str:
         ## name is already an environment
@@ -15,6 +18,10 @@ def load_environment(name):
     env_types = determain_env(name)
     if env_types['calvin']:
         return GymCalvin.make(name)
+    elif env_types['procgen']:
+        sub_env_name = name.split("-")[1]
+        return ProcgenWrappedEnv(name, 1, sub_env_name, 1, 1)
+
     # with suppress_output():
     #     wrapped_env = gym.make(name)
     wrapped_env = gym.make(name)
@@ -91,6 +98,8 @@ def sequence_dataset(env,  rewrite_last_terminal = True, build_next_obs = True, 
     
     # dataset = preprocess_fn(dataset)
     env_type = determain_env(env.spec.id)
+    if env_type['procgen']:
+        return env.get_sequence_dataset()
     if dataset is None:
         dataset = get_dataset(env)
 
@@ -259,6 +268,12 @@ meta_infos = {
         'tasks': ['calvin'],
         'datasets':[''],
         "versions":[''],
+        "sparse": "All zero. No reward at all."
+    },
+    "procgen": {
+        'tasks': ['procgen'],
+        'datasets':['maze'],
+        "versions":['500', '1000'],
         "sparse": "All zero. No reward at all."
     },
 }
