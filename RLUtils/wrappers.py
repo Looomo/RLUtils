@@ -16,13 +16,12 @@ class ProcgenWrappedEnv:
         self.t = np.zeros(num_envs)
 
         self.spec = SpecID(id = name)
-        self.get_sequence_dataset()
+        self.load_procgen_dataset()
+        self.load_sequence_dataset()
 
-    def sequence_dataset_procgen_maze(self, ):
+    def load_sequence_dataset(self, ):
         buffer = self.buffer
         nums_ = len(buffer['action'])
-        
-
 
         idx_traj_ended_list_ = np.where(self.buffer['terminals'])[0].tolist()
         idx_traj_ended = np.unique(sorted(idx_traj_ended_list_)) + 1
@@ -41,8 +40,8 @@ class ProcgenWrappedEnv:
 
         self.trajs_of_idxs = trajs_of_idxs
 
-        self.sequence_dataset = copy.deepcopy(self.buffer)
-        self.sequence_dataset['trajs_of_idxs'] = trajs_of_idxs
+        # self.sequence_dataset = copy.deepcopy(self.buffer)
+        # self.sequence_dataset['trajs_of_idxs'] = trajs_of_idxs
         trajs = []
         for idx_sequence in tqdm(trajs_of_idxs, desc=f"Building sequence of {self.spec.id}"):
             traj_info = {}
@@ -53,9 +52,9 @@ class ProcgenWrappedEnv:
             traj_info['idxs'] = idx_sequence
             trajs.append( traj_info )
         self.trajs = trajs
-        return trajs
+        return
 
-    def get_procgen_dataset(self,):
+    def load_procgen_dataset(self,):
         level = self.spec.id.split("-")[-1].split(".")[0]
         buffer_fname = f"data/procgen/level{level}.npz"
         print(f'get_procgen_dataset Attempting to load buffer: {buffer_fname}')
@@ -75,11 +74,15 @@ class ProcgenWrappedEnv:
         buffer['actions'] = buffer['action']
 
         self.buffer = buffer
-        return buffer
+
+        return
+    def get_procgen_dataset(self,):
+        
+        return self.buffer
     def get_sequence_dataset(self,):
 
-        raw = self.get_procgen_dataset()
-        trajs = self.sequence_dataset_procgen_maze()
+        # raw = self.get_procgen_dataset()
+        # trajs = self.sequence_dataset_procgen_maze()
         
         # raw['trajs'] = trajs
         
